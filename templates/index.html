@@ -710,11 +710,28 @@ async function loadReview(){
   d.items.forEach(p=>{
     const place=p.place==="직접입력"&&p.place_custom?p.place_custom:p.place;
     const el=document.createElement("div"); el.className="card";
-    el.innerHTML=`<div class="title" style="font-weight:600">${p.is_important?"⭐ ":""}${esc(p.title)}</div>
+    const conf = p.confidence || "certain";
+    const amb = conf === "ambiguous";
+    const multi = (p.sibling_count || 1) > 1;
+    const badge = amb
+      ? `<span class="pill" style="background:#fde68a;color:#92400e">△ 애매</span>`
+      : `<span class="pill" style="background:#d1fae5;color:#065f46">✓ 확실</span>`;
+    const note = p.verify_note
+      ? `<div class="muted" style="font-size:12px;color:#b45309;margin:2px 0">⚠ ${esc(p.verify_note)}</div>` : "";
+    let src = "";
+    if (p.source_text) {
+      const five = esc(p.source_text).split("\n").slice(0, 5).join("\n");
+      const openAttr = (amb || multi) ? " open" : "";
+      src = `<details${openAttr} style="margin-top:6px">
+        <summary class="muted" style="font-size:12px;cursor:pointer">원본 보기</summary>
+        <div class="muted" style="font-size:12px;white-space:pre-wrap;margin-top:4px">${five}</div></details>`;
+    }
+    el.innerHTML = `<div class="title" style="font-weight:600">${badge} ${p.is_important ? "⭐ " : ""}${esc(p.title)}</div>
       <div class="meta" style="font-size:12px;color:var(--mut);margin:4px 0">
         <span class="pill place">${place}</span>
-        <span class="pill">${p.start_date}${p.start_time?" "+p.start_time:""}</span></div>
-      ${p.source_text?`<div class="muted" style="font-size:12px">원문: ${esc(p.source_text).slice(0,80)}</div>`:""}
+        <span class="pill">${p.start_date}${p.start_time ? " " + p.start_time : ""}</span></div>
+      ${note}
+      ${src}
       <div class="row" style="margin-top:8px;gap:8px">
         <button class="btn-sm" style="color:var(--miss)" onclick="reviewAct(${p.id},'reject')">거절</button>
         <button class="btn-sm" onclick='editReview(${JSON.stringify(p).replace(/'/g,"&#39;")})'>수정</button>

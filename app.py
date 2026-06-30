@@ -11,6 +11,7 @@ import sqlite3
 import shutil
 import subprocess
 import secrets
+from verify import verify_consensus
 import base64
 import time
 import threading
@@ -115,6 +116,8 @@ CREATE TABLE IF NOT EXISTS plans (
     source        TEXT NOT NULL DEFAULT 'manual',    -- manual/auto
     review_status TEXT NOT NULL DEFAULT 'confirmed', -- confirmed/pending/rejected
     source_text   TEXT,                              -- 자동생성 원본 메시지
+    confidence    TEXT NOT NULL DEFAULT 'certain',
+    verify_note   TEXT NOT NULL DEFAULT '',
     created_at    TEXT,
     updated_at    TEXT
 );
@@ -185,6 +188,10 @@ def init_db():
     cols = {r[1] for r in db.execute("PRAGMA table_info(plans)").fetchall()}
     if "remind_min" not in cols:
         db.execute("ALTER TABLE plans ADD COLUMN remind_min INTEGER")
+    if "confidence" not in cols:
+        db.execute("ALTER TABLE plans ADD COLUMN confidence TEXT NOT NULL DEFAULT 'certain'")
+    if "verify_note" not in cols:
+        db.execute("ALTER TABLE plans ADD COLUMN verify_note TEXT NOT NULL DEFAULT ''")
     db.commit()
     db.close()
 
@@ -378,7 +385,7 @@ def api_logout():
 PLAN_FIELDS = ["title", "place", "place_custom", "note", "scope", "start_date",
                "end_date", "start_time", "end_time", "is_important", "remind_min",
                "recur_freq", "recur_interval", "recur_byweekday", "recur_until",
-               "source", "review_status", "source_text"]
+               "source", "review_status", "source_text", "confidence", "verify_note"]
 
 
 def _clean_plan_payload(data):
@@ -527,7 +534,15 @@ def api_review_queue():
     rows = db.execute(
         "SELECT * FROM plans WHERE review_status='pending' ORDER BY created_at DESC"
     ).fetchall()
-    return jsonify({"items": [plan_to_dict(r) for r in rows]})
+    from collections import Counter
+    stc = Counter(r["source_text"] for r in rows if r["source_text"])
+    items = []
+    for r in rows:
+        d = plan_to_dict(r)
+        st = r["source_text"]
+        d["sibling_count"] = stc.get(st, 1) if st else 1
+        items.append(d)
+    return jsonify({"items": items})
 
 
 # ---- 완료/미완료 사유 ---------------------------------------------------
@@ -688,7 +703,9 @@ PARSE_SYSTEM = """너는 한국어 일정 텍스트를 구조화하는 도우미
  "recur_freq": "none|daily|weekly|monthly|yearly"}
 규칙:
 - 오늘 날짜는 {today} (요일 포함). "다음주 화요일", "이번 금요일" 같은 표현을 실제 날짜로 환산.
+- 시각은 24시간제 HH:MM 으로 변환. 오후/저녁/밤 N시는 N+12 (예: 오후 3시 → 15:00), 정오·낮 12시는 12:00, 오전 N시는 그대로, 오전 12시·자정은 00:00.
 - 장소가 분명치 않으면 place는 "직접입력".
+- title은 원문에 나온 핵심 단어를 그대로 살려 짧게 만들어. 원문에 없는 장소·행위를 지어내지 마(예: "학부모 상담회"는 그대로, "스튜디오에서 만남" 같은 창작 금지).
 - 일정이 아니면(잡담 등) 빈 배열 [] 반환.
 - 설명/코드블록 없이 순수 JSON 배열만 출력."""
 
@@ -798,6 +815,19 @@ def claude_parse(text):
         return _parse_via_cli(text, sys), None
     except Exception as e:
         return None, str(e)
+
+
+def claude_parse_verified(text):
+    """일정이 있을 때만 3회 교차검증. (candidates, error).
+       0건이면 1회로 종료(한도 절약). 추가 호출 실패는 빈 벌로 취급."""
+    r1, err = claude_parse(text)
+    if err:
+        return None, err
+    if not r1:
+        return [], None
+    r2, _ = claude_parse(text)
+    r3, _ = claude_parse(text)
+    return verify_consensus([r1, r2 or [], r3 or []]), None
 
 
 @app.route("/api/parse", methods=["POST"])
@@ -1007,7 +1037,7 @@ def api_ingest():
         if kw and kw.lower() in low:
             return jsonify({"ok": True, "skipped": True, "reason": "excluded:" + kw,
                             "saved_ids": []})
-    candidates, err = claude_parse(text)
+    candidates, err = claude_parse_verified(text)
     if err:
         return jsonify({"error": err}), 502
     # 자동읽기 출처는 기본 데까르트, 검토대기 큐로
@@ -1016,6 +1046,22 @@ def api_ingest():
         if not c.get("place") or c.get("place") == "직접입력":
             c["place"] = forced_place
     saved, review = _save_candidates(candidates, "auto", text)
+    if saved:
+        n = len(saved)
+        amb = sum(1 for s in saved if s.get("confidence") == "ambiguous")
+        first = saved[0]
+        body = "%s · %s%s" % (first.get("title") or "일정",
+                              first.get("start_date") or "",
+                              (" " + first["start_time"]) if first.get("start_time") else "")
+        if n > 1:
+            body += " 외 %d건" % (n - 1)
+        if amb:
+            body += " · ⚠ 확인 필요 %d건" % amb
+        try:
+            broadcast({"title": "📋 검토할 일정 %d건" % n, "body": body,
+                       "url": "/?tab=review", "tag": "review"})
+        except Exception as e:
+            print("[ingest push] 실패:", e)
     return jsonify({"ok": True, "candidates": candidates,
                     "saved_ids": [s["id"] for s in saved]})
 

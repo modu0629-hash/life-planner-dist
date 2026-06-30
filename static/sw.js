@@ -1,5 +1,5 @@
 // 생활 플래너 service worker (Phase 1: 앱 셸 캐시 / Phase 2에서 푸시 추가 예정)
-const CACHE = "planner-v13";
+const CACHE = "planner-v15";
 const SHELL = ["/manifest.webmanifest", "/static/icon.svg"];
 
 self.addEventListener("install", e => {
@@ -34,7 +34,8 @@ self.addEventListener("push", e => {
   let data = {};
   try { data = e.data.json(); } catch (_) {}
   e.waitUntil(self.registration.showNotification(data.title || "생활 플래너", {
-    body: data.body || "", icon: "/static/icon.svg", badge: "/static/icon.svg", data: data
+    body: data.body || "", icon: "/static/icon.svg", badge: "/static/icon.svg",
+    tag: data.tag, renotify: !!data.tag, data: data
   }));
 });
 self.addEventListener("notificationclick", e => {
