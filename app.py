@@ -817,9 +817,9 @@ def api_parse():
         return jsonify({"candidates": candidates})
 
     source = data.get("source", "manual")
-    ids, review = _save_candidates(candidates, source, text)
-    return jsonify({"candidates": candidates, "saved_ids": ids,
-                    "review_status": review})
+    saved, review = _save_candidates(candidates, source, text)
+    return jsonify({"candidates": candidates, "saved": saved,
+                    "saved_ids": [s["id"] for s in saved], "review_status": review})
 
 
 import tempfile
@@ -903,9 +903,9 @@ def api_parse_file():
         if not save:
             return jsonify({"candidates": candidates})
         source = request.form.get("source", "manual")
-        ids, review = _save_candidates(candidates, source, "[파일] " + f.filename)
-        return jsonify({"candidates": candidates, "saved_ids": ids,
-                        "review_status": review})
+        saved, review = _save_candidates(candidates, source, "[파일] " + f.filename)
+        return jsonify({"candidates": candidates, "saved": saved,
+                        "saved_ids": [s["id"] for s in saved], "review_status": review})
     finally:
         try:
             os.unlink(tmp.name)
@@ -914,10 +914,11 @@ def api_parse_file():
 
 
 def _save_candidates(candidates, source, text):
-    """파싱된 일정 후보를 DB에 저장. auto 면 검토대기(pending)."""
+    """파싱된 일정 후보를 DB에 저장. auto 면 검토대기(pending).
+       반환: (저장된 plan dict 목록, review_status)."""
     review = "pending" if source == "auto" else "confirmed"
     db = get_db()
-    ids = []
+    saved = []
     for c in candidates:
         p = _clean_plan_payload(c)
         if not p.get("title") or not p.get("start_date"):
@@ -932,9 +933,10 @@ def _save_candidates(candidates, source, text):
         cols = ",".join(p.keys())
         ph = ",".join("?" * len(p))
         cur = db.execute(f"INSERT INTO plans ({cols}) VALUES ({ph})", list(p.values()))
-        ids.append(cur.lastrowid)
+        row = db.execute("SELECT * FROM plans WHERE id=?", (cur.lastrowid,)).fetchone()
+        saved.append(plan_to_dict(row))
     db.commit()
-    return ids, review
+    return saved, review
 
 
 def get_ingest_token():
@@ -1013,8 +1015,9 @@ def api_ingest():
     for c in candidates:
         if not c.get("place") or c.get("place") == "직접입력":
             c["place"] = forced_place
-    ids, review = _save_candidates(candidates, "auto", text)
-    return jsonify({"ok": True, "candidates": candidates, "saved_ids": ids})
+    saved, review = _save_candidates(candidates, "auto", text)
+    return jsonify({"ok": True, "candidates": candidates,
+                    "saved_ids": [s["id"] for s in saved]})
 
 
 # ---- 연간 사이클 (P4 기초) ----------------------------------------------

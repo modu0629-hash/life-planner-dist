@@ -170,7 +170,8 @@
       style="padding:14px;border:1px dashed var(--line)">
     <button class="btn-accent" style="width:100%;margin-top:8px" onclick="parseFiles()">🖼️ 사진/PDF → 일정 변환</button>
 
-    <div id="autoResult" style="margin-top:12px"></div>
+    <div id="autoStatus" style="margin-top:12px"></div>
+    <div id="autoResult" style="margin-top:6px"></div>
   </div>
 
   <!-- 탭: 통계 -->
@@ -588,7 +589,9 @@ function openPlanModal(presetPlace, presetDate){
   document.querySelectorAll("#weekdayBtns button").forEach(b=>{b.classList.remove("sel","btn-accent");});
   openModal("planModal");
 }
+let _autoEditIdx=null;
 function editPlan(it){
+  _autoEditIdx=null;
   openModal("planModal");
   $("#planModalTitle").textContent="일정 수정"; $("#planId").value=it.plan_id;
   $("#planDelBtn").classList.remove("hide");
@@ -620,6 +623,10 @@ async function savePlan(){
   try{
     if(id) await api("/api/plans/"+id,{method:"PUT",body:JSON.stringify(body)});
     else await api("/api/plans",{method:"POST",body:JSON.stringify(body)});
+    // 자동입력 목록에서 수정한 경우 그 항목도 갱신
+    if(id && _autoEditIdx!=null && AUTO_LIST[_autoEditIdx]){
+      Object.assign(AUTO_LIST[_autoEditIdx], body); renderAutoList(); _autoEditIdx=null;
+    }
     closeModal("planModal"); toast("저장됨"); afterPlanChange();
   } finally {
     _savingPlan=false; if(btn) btn.disabled=false;
@@ -722,23 +729,21 @@ async function reviewAct(id,action){
 }
 
 // ---------- 자동입력 ----------
+let AUTO_LIST=[];   // 자동입력으로 방금 만든 일정들(최근이 위)
 async function parseText(){
   const text=$("#autoText").value.trim(); if(!text){ toast("텍스트를 넣어줘"); return; }
-  if(!META.claude_enabled){ toast("서버에 anthropic_api_key 설정 필요"); return; }
+  if(!META.claude_enabled){ toast("서버에 claude 설정 필요"); return; }
   const src=$("#autoSource").value;
-  $("#autoResult").innerHTML=`<div class="card center muted">변환 중...</div>`;
+  const status=$("#autoStatus"); status.innerHTML=`<div class="card center muted">변환 중...</div>`;
   try{
     const d=await api("/api/parse",{method:"POST",body:JSON.stringify({text,save:true,source:src})});
-    if(d.error){ $("#autoResult").innerHTML=`<div class="card" style="color:var(--miss)">에러: ${esc(d.error)}</div>`; return; }
-    const n=(d.saved_ids||[]).length;
-    let html=`<div class="card"><b>${n}건 ${src==="auto"?"검토큐에 추가":"등록"}됨</b>`;
-    (d.candidates||[]).forEach(c=>{ html+=`<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px">
-      ${esc(c.title)} · ${c.start_date||"?"} ${c.start_time||""} <span class="pill place">${c.place||"직접입력"}</span></div>`; });
-    html+=`</div>`;
-    $("#autoResult").innerHTML=html; $("#autoText").value="";
-    refreshReviewBadge();
-    if(src!=="auto") render();
-  }catch(e){ $("#autoResult").innerHTML=`<div class="card" style="color:var(--miss)">실패: ${e}</div>`; }
+    if(d.error){ status.innerHTML=`<div class="card" style="color:var(--miss)">에러: ${esc(d.error)}</div>`; return; }
+    const saved=d.saved||[];
+    AUTO_LIST=saved.concat(AUTO_LIST);
+    status.innerHTML=`<div class="muted">${saved.length}건 ${src==="auto"?"검토큐로 보냄":"등록됨"}</div>`;
+    $("#autoText").value="";
+    renderAutoList(); refreshReviewBadge();
+  }catch(e){ status.innerHTML=`<div class="card" style="color:var(--miss)">실패: ${e}</div>`; }
 }
 
 async function parseFiles(){
@@ -746,25 +751,57 @@ async function parseFiles(){
   if(!files||!files.length){ toast("사진이나 PDF를 골라줘"); return; }
   if(!META.claude_enabled){ toast("서버에 claude 설정 필요"); return; }
   const src=$("#autoSource").value;
-  const res=$("#autoResult");
-  let allHtml="", total=0;
+  const status=$("#autoStatus"); let total=0;
   for(let i=0;i<files.length;i++){
-    res.innerHTML=`<div class="card center muted">${files[i].name} 읽는 중... (${i+1}/${files.length})</div>`;
+    status.innerHTML=`<div class="card center muted">${esc(files[i].name)} 읽는 중... (${i+1}/${files.length})</div>`;
     const fd=new FormData(); fd.append("file",files[i]); fd.append("save","1"); fd.append("source",src);
     try{
       const r=await fetch("/api/parse-file",{method:"POST",body:fd});
       const d=await r.json();
-      if(d.error){ allHtml+=`<div class="card" style="color:var(--miss)">${esc(files[i].name)}: ${esc(d.error)}</div>`; continue; }
-      const n=(d.saved_ids||[]).length; total+=n;
-      let h=`<div class="card"><b>📄 ${esc(files[i].name)} — ${n}건 ${src==="auto"?"검토큐로":"등록"}</b>`;
-      (d.candidates||[]).forEach(c=>{ h+=`<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px">
-        ${esc(c.title||"?")} · ${c.start_date||"?"} ${c.start_time||""} <span class="pill place">${esc(c.place||"직접입력")}</span></div>`; });
-      h+=`</div>`; allHtml+=h;
-    }catch(e){ allHtml+=`<div class="card" style="color:var(--miss)">${esc(files[i].name)}: ${e}</div>`; }
+      if(d.error){ status.innerHTML=`<div class="card" style="color:var(--miss)">${esc(files[i].name)}: ${esc(d.error)}</div>`; continue; }
+      const saved=d.saved||[]; total+=saved.length;
+      AUTO_LIST=saved.concat(AUTO_LIST);
+      renderAutoList();
+    }catch(e){ status.innerHTML=`<div class="card" style="color:var(--miss)">${esc(files[i].name)}: ${e}</div>`; }
   }
-  res.innerHTML=allHtml||`<div class="card muted">읽은 일정이 없어</div>`;
-  inp.value=""; refreshReviewBadge();
-  if(src!=="auto"){ toast(`${total}건 등록됨`); }
+  status.innerHTML=`<div class="muted">${total}건 ${src==="auto"?"검토큐로 보냄":"등록됨"}</div>`;
+  inp.value=""; renderAutoList(); refreshReviewBadge();
+}
+
+function renderAutoList(){
+  const c=$("#autoResult");
+  if(!AUTO_LIST.length){ c.innerHTML=""; return; }
+  let html=`<div class="row" style="margin:6px 0"><b>방금 만든 일정 ${AUTO_LIST.length}건</b>
+    <div class="spacer"></div><button class="btn-sm" onclick="clearAutoList()">목록 비우기</button></div>`;
+  AUTO_LIST.forEach((p,i)=>{
+    const place=p.place==="직접입력"&&p.place_custom?p.place_custom:p.place;
+    const t=p.start_time?` ${p.start_time}`:"";
+    const badge=p.review_status==="pending"?` <span class="pill badge-auto">검토대기</span>`:"";
+    html+=`<div class="card" style="padding:10px">
+      <div>${p.is_important?"⭐ ":""}<b>${esc(p.title)}</b></div>
+      <div class="meta" style="font-size:12px;color:var(--mut);margin:4px 0">
+        <span class="pill place">${esc(place)}</span>
+        <span class="pill">${p.start_date}${t}</span>${badge}</div>
+      <div class="row" style="gap:8px">
+        <button class="btn-sm" onclick="editAuto(${i})">수정</button>
+        <button class="btn-sm" style="color:var(--miss)" onclick="deleteAuto(${i})">삭제</button>
+      </div></div>`;
+  });
+  c.innerHTML=html;
+}
+function clearAutoList(){ AUTO_LIST=[]; renderAutoList(); }
+function editAuto(i){
+  const p=AUTO_LIST[i]; if(!p) return;
+  editPlan({plan_id:p.id, date:p.start_date, title:p.title, place:p.place, place_custom:p.place_custom,
+    note:p.note, start_time:p.start_time, end_time:p.end_time, recur_freq:p.recur_freq,
+    scope:p.scope, is_important:p.is_important, remind_min:p.remind_min});
+  _autoEditIdx=i;   // 저장 후 자동입력 목록도 갱신
+}
+async function deleteAuto(i){
+  const p=AUTO_LIST[i]; if(!p) return;
+  if(!confirm(`"${p.title}" 삭제할까?`)) return;
+  await api("/api/plans/"+p.id,{method:"DELETE"});
+  AUTO_LIST.splice(i,1); renderAutoList(); refreshReviewBadge(); toast("삭제됨");
 }
 
 // ---------- 통계 ----------
