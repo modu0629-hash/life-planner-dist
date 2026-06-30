@@ -1130,7 +1130,7 @@ def send_push(sub_row, payload):
                                "keys": {"p256dh": sub_row["p256dh"], "auth": sub_row["auth"]}},
             data=json.dumps(payload, ensure_ascii=False),
             vapid_private_key=priv,
-            vapid_claims={"sub": CONFIG.get("vapid_sub", "mailto:modu0629@gmail.com")},
+            vapid_claims={"sub": CONFIG.get("vapid_sub", "mailto:admin@example.com")},
             ttl=86400,   # WNS(윈도우 푸시)는 ttl=0 을 거부(400) → 반드시 설정
             timeout=15,
         )
