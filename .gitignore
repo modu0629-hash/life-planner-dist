@@ -1,0 +1,5 @@
+config.json
+planner.db
+__pycache__/
+*.pyc
+SECRETS.txt

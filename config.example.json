@@ -1,0 +1,15 @@
+{
+  "ui_password": "",
+  "anthropic_api_key": "",
+  "claude_cli_path": "",
+  "claude_model": "claude-haiku-4-5-20251001",
+  "cli_timeout": 120,
+  "timezone": "Asia/Seoul",
+  "port": 5558,
+
+  "_help": {
+    "anthropic_api_key": "비워두면 자동입력 파싱을 Claude Code CLI(claude -p)로 처리 = Max 구독 사용, 추가 비용 없음. 키를 넣으면 api.anthropic.com 직접 호출.",
+    "claude_cli_path": "claude 실행 파일 경로. 비우면 PATH에서 자동 탐색. (백엔드 도는 머신에 claude CLI + Max 로그인 필요)",
+    "ui_password": "Funnel 공개 주소의 유일한 보안벽. 외부 노출 시 반드시 설정."
+  }
+}

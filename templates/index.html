@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#f4f6fb">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>생활 플래너</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --card2:#eef1f8; --line:#e3e7f0;
+    --txt:#1f2433; --mut:#717789; --accent:#6366f1; --accent2:#4f46e5;
+    --done:#16a34a; --miss:#dc2626; --imp:#d97706; --pend:#2563eb;
+    --shadow:0 1px 3px rgba(30,40,80,.07), 0 1px 2px rgba(30,40,80,.04);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Segoe UI",sans-serif;
+    padding-bottom:70px; font-size:15px}
+  header{position:sticky; top:0; z-index:20; background:var(--bg);
+    padding:12px 14px 8px; border-bottom:1px solid var(--line)}
+  h1{font-size:18px; margin:0 0 8px}
+  .row{display:flex; align-items:center; gap:8px}
+  .spacer{flex:1}
+  button{font:inherit; color:var(--txt); background:var(--card2);
+    border:1px solid var(--line); border-radius:10px; padding:8px 12px; cursor:pointer}
+  button:active{transform:scale(.97)}
+  .btn-accent{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn-sm{padding:5px 9px; font-size:13px; border-radius:8px}
+  .btn-ghost{background:transparent}
+  input,select,textarea{font:inherit; color:var(--txt); background:var(--card2);
+    border:1px solid var(--line); border-radius:10px; padding:9px 10px; width:100%; min-width:0;
+    box-sizing:border-box; max-width:100%; -webkit-appearance:none; appearance:none}
+  input[type=date],input[type=time]{ -webkit-appearance:none; appearance:none; }
+  input[type=date]::-webkit-date-and-time-value,
+  input[type=time]::-webkit-date-and-time-value{ text-align:left; min-width:0; }
+  textarea{resize:vertical; min-height:90px}
+  label{font-size:13px; color:var(--mut); display:block; margin:10px 0 4px}
+  .content{padding:12px 14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:12px; margin-bottom:10px; box-shadow:var(--shadow)}
+  .pill{display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px;
+    background:var(--card2); color:var(--mut); border:1px solid var(--line)}
+  .pill.place{color:var(--accent2)}
+  .muted{color:var(--mut); font-size:13px}
+  .day-head{display:flex; align-items:center; gap:8px; margin:14px 0 6px; font-weight:600}
+  .day-head .date{color:var(--mut); font-weight:400; font-size:13px}
+  .day-head.today{color:var(--accent2)}
+  .plan{display:flex; align-items:flex-start; gap:10px; padding:10px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; margin-bottom:8px; box-shadow:var(--shadow)}
+  .plan.done{opacity:.55}
+  .plan.done .title{text-decoration:line-through}
+  .plan.imp{border-left:3px solid var(--imp)}
+  .chk{width:26px; height:26px; border-radius:50%; border:2px solid var(--line);
+    flex:none; display:flex; align-items:center; justify-content:center; font-size:15px; cursor:pointer}
+  .chk.done{background:var(--done); border-color:var(--done); color:#fff}
+  .chk.missed{background:var(--miss); border-color:var(--miss); color:#fff}
+  .plan .title{font-weight:600}
+  .plan .meta{font-size:12px; color:var(--mut); margin-top:3px; display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .tabbar{position:fixed; bottom:0; left:0; right:0; display:flex;
+    background:var(--card); border-top:1px solid var(--line); z-index:30;
+    box-shadow:0 -2px 8px rgba(30,40,80,.06)}
+  .tabbar button{flex:1; border:none; border-radius:0; background:transparent;
+    padding:8px 0 10px; font-size:11px; color:var(--mut); display:flex;
+    flex-direction:column; align-items:center; gap:3px}
+  .tabbar button.active{color:var(--accent2)}
+  .tabbar .ic{font-size:19px}
+  .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50;
+    display:none; align-items:flex-end; justify-content:center}
+  .modal-bg.open{display:flex}
+  .modal{background:var(--card); width:100%; max-width:520px; border-radius:18px 18px 0 0;
+    padding:16px; max-height:90vh; overflow:auto}
+  .modal h2{margin:0 0 6px; font-size:17px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .grid2 > div{min-width:0}
+  .reason-btn{text-align:left; margin:0}
+  .reason-btn.sel{background:var(--accent); border-color:var(--accent); color:#fff}
+  .progress{height:10px; background:var(--card2); border-radius:999px; overflow:hidden; margin:6px 0}
+  .progress > span{display:block; height:100%; background:var(--done)}
+  .bar-row{display:flex; align-items:center; gap:8px; margin:6px 0; font-size:13px}
+  .bar{flex:1; height:8px; background:var(--card2); border-radius:999px; overflow:hidden}
+  .bar > span{display:block; height:100%; background:var(--accent)}
+  .stat-big{font-size:34px; font-weight:700}
+  .center{text-align:center}
+  .hide{display:none !important}
+  .seg{display:flex; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .seg button{border:none; border-radius:0; background:transparent; flex:1; padding:7px}
+  .seg button.active{background:var(--accent); color:#fff}
+  .toast{position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    background:#000; color:#fff; padding:9px 16px; border-radius:999px; z-index:99;
+    font-size:13px; opacity:0; transition:opacity .25s}
+  .toast.show{opacity:.92}
+  .checkin-place{font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:6px}
+  .ci-plan{padding:6px 8px; margin:4px 0; background:var(--card2); border-radius:8px; font-size:14px; cursor:pointer}
+  .none-btn{font-size:13px; padding:5px 14px}
+  .none-btn.on{background:var(--done); border-color:var(--done); color:#fff; font-weight:600}
+  .star-btn{flex:none; align-self:center; font-size:22px; cursor:pointer; padding:2px 4px;
+    color:var(--mut); line-height:1}
+  .star-btn.on{color:var(--imp)}
+  .badge-auto{background:#fef3c7; color:#b45309; border-color:#fde68a}
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="loginView" class="content hide">
+  <div class="card" style="margin-top:60px">
+    <h2 style="margin-top:0">🔒 로그인</h2>
+    <input id="loginPw" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <button class="btn-accent" style="width:100%;margin-top:10px" onclick="doLogin()">들어가기</button>
+  </div>
+</div>
+
+<div id="app" class="hide">
+  <header>
+    <div class="row">
+      <h1 id="hdrTitle">🗓️ 이번 주</h1>
+      <div class="spacer"></div>
+      <button class="btn-sm" id="filterBtn" onclick="cycleFilter()">전체</button>
+    </div>
+    <div class="row" id="weekNav">
+      <button class="btn-sm" onclick="moveRange(-1)">‹</button>
+      <div class="seg" style="flex:1">
+        <button data-scope="week" class="active" onclick="setScope('week')">주</button>
+        <button data-scope="month" onclick="setScope('month')">월</button>
+        <button data-scope="year" onclick="setScope('year')">년</button>
+      </div>
+      <button class="btn-sm" onclick="moveRange(1)">›</button>
+      <button class="btn-sm" onclick="goToday()">오늘</button>
+    </div>
+    <div id="weekProgress"></div>
+  </header>
+
+  <!-- 탭: 일정 -->
+  <div id="tab-plan" class="content tabview"></div>
+
+  <!-- 탭: 체크인 -->
+  <div id="tab-checkin" class="content tabview hide">
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn-sm" onclick="moveCheckin(-1)">‹</button>
+      <input id="checkinDate" type="date" style="flex:1" onchange="loadCheckin()">
+      <button class="btn-sm" onclick="moveCheckin(1)">›</button>
+    </div>
+    <div class="muted" style="margin-bottom:8px">매일 장소별로 점검 — 빠진 일정 없는지 보고 <b>여기서 바로 추가</b>. 진짜 없으면 “없음” 체크.</div>
+    <div id="checkinList"></div>
+  </div>
+
+  <!-- 탭: 검토큐 -->
+  <div id="tab-review" class="content tabview hide">
+    <div class="muted" style="margin-bottom:8px">데까르트 자동 제안이야. 검토하고 승인/거절해줘.</div>
+    <div id="reviewList"></div>
+  </div>
+
+  <!-- 탭: 자동입력 -->
+  <div id="tab-auto" class="content tabview hide">
+    <div class="muted" style="margin-bottom:6px">카톡/문자/메모를 붙여넣거나, 사진·PDF를 올리면 일정으로 바꿔줘.</div>
+    <label>출처</label>
+    <select id="autoSource">
+      <option value="manual">직접 (바로 등록)</option>
+      <option value="auto">데까르트 자동 (검토큐로)</option>
+    </select>
+    <label>메시지 텍스트</label>
+    <textarea id="autoText" placeholder="예) 다음주 화요일 데까르트 오후 7시 학부모 상담, 금요일 화천 출장"></textarea>
+    <button class="btn-accent" style="width:100%;margin-top:8px" onclick="parseText()">🤖 텍스트 → 일정 변환</button>
+
+    <div style="border-top:1px solid var(--line);margin:16px 0 10px"></div>
+    <label>📷 사진 · 📄 PDF 에서 읽기</label>
+    <div class="muted" style="font-size:12px;margin-bottom:6px">시간표·가정통신문 캡처, 받은 사진, 안내 PDF 등을 골라줘. (여러 장 가능)</div>
+    <input type="file" id="autoFile" accept="image/*,application/pdf" multiple
+      style="padding:14px;border:1px dashed var(--line)">
+    <button class="btn-accent" style="width:100%;margin-top:8px" onclick="parseFiles()">🖼️ 사진/PDF → 일정 변환</button>
+
+    <div id="autoResult" style="margin-top:12px"></div>
+  </div>
+
+  <!-- 탭: 통계 -->
+  <div id="tab-stats" class="content tabview hide">
+    <div id="statsBody"></div>
+  </div>
+
+  <!-- 탭: 설정 -->
+  <div id="tab-settings" class="content tabview hide">
+    <div class="card">
+      <h2 style="margin-top:0">🔔 알림</h2>
+      <div class="muted" id="pushState" style="margin-bottom:8px">상태 확인 중...</div>
+      <button id="pushToggleBtn" class="btn-accent" style="width:100%" onclick="togglePush()">이 기기에서 알림 받기</button>
+      <button id="pushTestBtn" style="width:100%;margin-top:8px" onclick="testPush()">테스트 알림 보내기 (서버 경유)</button>
+      <button style="width:100%;margin-top:8px" onclick="localTest()">📍 로컬 알림 테스트 (브라우저가 직접)</button>
+      <div class="muted" style="margin-top:8px;font-size:12px">
+        ⚠️ 아이폰은 Safari에서 <b>“홈 화면에 추가”</b>로 설치한 뒤에야 알림을 받을 수 있어.
+        안드로이드/PC 크롬은 바로 돼.</div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">알림 시간</h2>
+      <label class="row" style="cursor:pointer;margin-top:0">
+        <input type="checkbox" id="n_weekly" style="width:auto"> <span>주간 계획 입력 알람</span></label>
+      <div class="grid2" style="margin-top:6px">
+        <div><label>시각</label><input id="n_weekly_time" type="time"></div>
+        <div><label>요일</label>
+          <div class="row" id="n_weekly_days" style="gap:3px;flex-wrap:wrap;margin-top:4px"></div>
+        </div>
+      </div>
+      <label class="row" style="cursor:pointer;margin-top:14px">
+        <input type="checkbox" id="n_morning" style="width:auto"> <span>빈 요일 아침 알람</span></label>
+      <div class="muted" style="font-size:12px;margin:2px 0 4px">그날 일정이 하나도 없을 때만 아침에 알려줘.</div>
+      <label>시각</label><input id="n_morning_time" type="time">
+
+      <label class="row" style="cursor:pointer;margin-top:14px">
+        <input type="checkbox" id="n_remind" style="width:auto"> <span>일정 시작 전 알림</span></label>
+      <div class="muted" style="font-size:12px;margin:2px 0 4px">시간 지정된 일정에 기본으로 적용 (일정마다 따로 바꿀 수 있어).</div>
+      <label>기본 알림 시점</label>
+      <select id="n_remind_default">
+        <option value="0">정시(시작 시각)</option>
+        <option value="5">5분 전</option>
+        <option value="10">10분 전</option>
+        <option value="15">15분 전</option>
+        <option value="30">30분 전</option>
+        <option value="60">1시간 전</option>
+        <option value="120">2시간 전</option>
+        <option value="1440">하루 전</option>
+      </select>
+      <button class="btn-accent" style="width:100%;margin-top:12px" onclick="saveNotif()">알림 설정 저장</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">🤖 자동읽기 제외</h2>
+      <div class="muted" style="font-size:12px;margin-bottom:8px">데까르트 카톡 중 <b>일정으로 안 만들 방·문구</b>를 등록해줘. 메시지에 이 단어가 있으면 검토큐에 안 들어가.</div>
+      <div class="row" style="gap:6px">
+        <input id="exInput" placeholder="예: 광고, 공지방 이름" onkeydown="if(event.key==='Enter')addExclude()">
+        <button class="btn-accent btn-sm" onclick="addExclude()">추가</button>
+      </div>
+      <div id="exList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <p class="muted">개인 생활 플래너 · 학원 서버 · Phase 3</p>
+      <button onclick="logout()" style="width:100%">로그아웃</button>
+    </div>
+  </div>
+
+  <!-- 탭바 -->
+  <nav class="tabbar">
+    <button data-tab="plan" class="active" onclick="switchTab('plan')"><span class="ic">🗓️</span>일정</button>
+    <button data-tab="checkin" onclick="switchTab('checkin')"><span class="ic">✅</span>체크인</button>
+    <button data-tab="auto" onclick="switchTab('auto')"><span class="ic">🤖</span>자동입력</button>
+    <button data-tab="review" onclick="switchTab('review')"><span class="ic">📥</span><span id="reviewBadge">검토</span></button>
+    <button data-tab="stats" onclick="switchTab('stats')"><span class="ic">📊</span>통계</button>
+    <button data-tab="settings" onclick="switchTab('settings')"><span class="ic">⚙️</span>설정</button>
+  </nav>
+</div>
+
+<!-- 일정 추가/수정 FAB -->
+<button id="fab" class="btn-accent hide" style="position:fixed; right:16px; bottom:78px;
+  width:54px; height:54px; border-radius:50%; font-size:26px; z-index:25; padding:0"
+  onclick="openPlanModal()">＋</button>
+
+<!-- 일정 모달 -->
+<div class="modal-bg" id="planModal">
+  <div class="modal">
+    <h2 id="planModalTitle">일정 추가</h2>
+    <input type="hidden" id="planId">
+    <label>제목</label>
+    <input id="f_title" placeholder="할 일">
+    <div class="grid2">
+      <div><label>날짜</label><input id="f_date" type="date"></div>
+      <div><label>장소</label><select id="f_place"></select></div>
+    </div>
+    <div class="grid2" id="customPlaceWrap" style="display:none">
+      <div style="grid-column:1/3"><label>장소 직접입력</label><input id="f_place_custom" placeholder="장소명"></div>
+    </div>
+    <div class="grid2">
+      <div><label>시작시간</label><input id="f_stime" type="time"></div>
+      <div><label>종료시간</label><input id="f_etime" type="time"></div>
+    </div>
+    <label>메모</label>
+    <input id="f_note" placeholder="(선택)">
+    <div class="grid2">
+      <div><label>반복</label>
+        <select id="f_recur">
+          <option value="none">반복 없음</option>
+          <option value="daily">매일</option>
+          <option value="weekly">매주</option>
+          <option value="monthly">매월</option>
+          <option value="yearly">매년</option>
+        </select>
+      </div>
+      <div><label>계획 단위</label>
+        <select id="f_scope">
+          <option value="week">주간</option>
+          <option value="month">월간</option>
+          <option value="year">연간</option>
+        </select>
+      </div>
+    </div>
+    <div id="weekdayWrap" style="display:none">
+      <label>반복 요일</label>
+      <div class="row" id="weekdayBtns" style="gap:4px;flex-wrap:wrap"></div>
+    </div>
+    <label>시작 전 알림</label>
+    <select id="f_remind">
+      <option value="">기본값 사용</option>
+      <option value="-1">알림 없음</option>
+      <option value="0">정시(시작 시각)</option>
+      <option value="5">5분 전</option>
+      <option value="10">10분 전</option>
+      <option value="15">15분 전</option>
+      <option value="30">30분 전</option>
+      <option value="60">1시간 전</option>
+      <option value="120">2시간 전</option>
+      <option value="1440">하루 전</option>
+    </select>
+    <div class="muted" id="remindHint" style="font-size:12px;margin-top:3px">※ 시간이 지정된 일정만 알림이 와</div>
+    <label class="row" style="margin-top:10px; cursor:pointer">
+      <input type="checkbox" id="f_imp" style="width:auto"> <span>⭐ 중요 일정</span>
+    </label>
+    <div class="row" style="margin-top:14px; gap:8px">
+      <button id="planDelBtn" class="hide" style="color:var(--miss)" onclick="deletePlan()">삭제</button>
+      <div class="spacer"></div>
+      <button onclick="closeModal('planModal')">취소</button>
+      <button id="savePlanBtn" class="btn-accent" onclick="savePlan()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 미완료 사유 모달 -->
+<div class="modal-bg" id="missModal">
+  <div class="modal">
+    <h2>왜 완료 못했어?</h2>
+    <p class="muted" id="missPlanName"></p>
+    <div class="grid2" id="missReasons"></div>
+    <div id="missCustomWrap" class="hide">
+      <label>직접 입력</label>
+      <input id="missCustom" placeholder="이유를 적어줘">
+    </div>
+    <div class="row" style="margin-top:14px">
+      <div class="spacer"></div>
+      <button onclick="closeModal('missModal')">취소</button>
+      <button class="btn-accent" onclick="saveMiss()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WD = ["월","화","수","목","금","토","일"];
+let META = null, CURRENT_TAB = "plan", SCOPE = "week";
+let RANGE_START = null;            // 표시 범위 시작 (Date)
+let FILTER_PLACE = null;          // null=전체
+let CHECKIN_DATE = null;
+let missCtx = null, selReason = null;
+
+// ---------- 유틸 ----------
+const $ = s => document.querySelector(s);
+function fmt(d){ return d.toISOString().slice(0,10); }
+function parseD(s){ const [y,m,dd]=s.split("-").map(Number); return new Date(y,m-1,dd); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function startOfWeek(d){ const x=new Date(d); const wd=(x.getDay()+6)%7; return addDays(x,-wd); }
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),1600); }
+async function api(path, opts){
+  const r = await fetch(path, Object.assign({headers:{"Content-Type":"application/json"}}, opts));
+  if(r.status===401){ showLogin(); throw new Error("unauth"); }
+  return r.json();
+}
+
+// ---------- 부팅 ----------
+async function boot(){
+  META = await (await fetch("/api/meta")).json();
+  if(META.password_required && !META.authed){ showLogin(); return; }
+  startApp();
+}
+function showLogin(){ $("#app").classList.add("hide"); $("#fab").classList.add("hide");
+  $("#loginView").classList.remove("hide"); }
+async function doLogin(){
+  const r = await api("/api/login",{method:"POST",body:JSON.stringify({password:$("#loginPw").value})});
+  if(r.ok){ META = await (await fetch("/api/meta")).json(); $("#loginView").classList.add("hide"); startApp(); }
+  else toast("비밀번호 틀림");
+}
+async function logout(){ await api("/api/logout",{method:"POST"}); location.reload(); }
+
+function startApp(){
+  $("#loginView").classList.add("hide");
+  $("#app").classList.remove("hide"); $("#fab").classList.remove("hide");
+  RANGE_START = startOfWeek(parseD(META.today));
+  CHECKIN_DATE = META.today;
+  $("#checkinDate").value = META.today;
+  // place select
+  const ps = $("#f_place"); ps.innerHTML="";
+  META.places.forEach(p=>{ const o=document.createElement("option"); o.value=o.textContent=p; ps.appendChild(o); });
+  ps.onchange = ()=>{ $("#customPlaceWrap").style.display = ps.value==="직접입력"?"grid":"none"; };
+  // weekday buttons
+  const wb=$("#weekdayBtns"); wb.innerHTML="";
+  WD.forEach((w,i)=>{ const b=document.createElement("button"); b.className="btn-sm"; b.textContent=w;
+    b.dataset.wd=i; b.onclick=()=>{ b.classList.toggle("sel"); b.classList.toggle("btn-accent"); }; wb.appendChild(b); });
+  $("#f_recur").onchange = ()=>{ $("#weekdayWrap").style.display = $("#f_recur").value==="weekly"?"block":"none"; };
+  // miss reasons
+  const mr=$("#missReasons"); mr.innerHTML="";
+  META.miss_reasons.forEach(r=>{ const b=document.createElement("button"); b.className="reason-btn"; b.textContent=r;
+    b.onclick=()=>selectReason(b,r); mr.appendChild(b); });
+  buildNotifDays();
+  render();
+  refreshReviewBadge();
+}
+
+// ---------- 탭 ----------
+function switchTab(t){
+  CURRENT_TAB=t;
+  document.querySelectorAll(".tabview").forEach(e=>e.classList.add("hide"));
+  $("#tab-"+t).classList.remove("hide");
+  document.querySelectorAll(".tabbar button").forEach(b=>b.classList.toggle("active", b.dataset.tab===t));
+  $("#fab").classList.toggle("hide", t!=="plan");
+  $("header").style.display = (t==="plan")?"block":"none";
+  if(t==="plan") render();
+  if(t==="checkin") loadCheckin();
+  if(t==="review") loadReview();
+  if(t==="stats") loadStats();
+  if(t==="settings") loadSettingsTab();
+}
+
+// ---------- 범위 계산 ----------
+function rangeBounds(){
+  let s, e;
+  if(SCOPE==="week"){ s=startOfWeek(RANGE_START); e=addDays(s,6); }
+  else if(SCOPE==="month"){ s=new Date(RANGE_START.getFullYear(),RANGE_START.getMonth(),1);
+    e=new Date(RANGE_START.getFullYear(),RANGE_START.getMonth()+1,0); }
+  else { s=new Date(RANGE_START.getFullYear(),0,1); e=new Date(RANGE_START.getFullYear(),11,31); }
+  return [s,e];
+}
+function setScope(sc){ SCOPE=sc; document.querySelectorAll("[data-scope]").forEach(b=>b.classList.toggle("active",b.dataset.scope===sc)); render(); }
+function moveRange(n){
+  if(SCOPE==="week") RANGE_START=addDays(RANGE_START,7*n);
+  else if(SCOPE==="month") RANGE_START=new Date(RANGE_START.getFullYear(),RANGE_START.getMonth()+n,1);
+  else RANGE_START=new Date(RANGE_START.getFullYear()+n,0,1);
+  render();
+}
+function goToday(){ RANGE_START=startOfWeek(parseD(META.today)); if(SCOPE!=="week") RANGE_START=parseD(META.today); render(); }
+function cycleFilter(){
+  const list=[null,...META.places];
+  let i=list.indexOf(FILTER_PLACE); FILTER_PLACE=list[(i+1)%list.length];
+  $("#filterBtn").textContent = FILTER_PLACE||"전체"; render();
+}
+
+// ---------- 일정 렌더 ----------
+async function render(){
+  if(CURRENT_TAB!=="plan") return;
+  const [s,e]=rangeBounds();
+  const titles={week:"🗓️ 주간",month:"🗓️ 월간",year:"🗓️ 연간"};
+  $("#hdrTitle").textContent = titles[SCOPE]+" · "+s.getFullYear()+"."+(s.getMonth()+1);
+  let url=`/api/plans?from=${fmt(s)}&to=${fmt(e)}`;
+  if(FILTER_PLACE) url+=`&place=${encodeURIComponent(FILTER_PLACE)}`;
+  const data = await api(url);
+  // 완료율 (이 범위)
+  renderProgress(data.items);
+  // 날짜별 그룹
+  const byDate={};
+  data.items.forEach(it=>{ (byDate[it.date]=byDate[it.date]||[]).push(it); });
+  const cont=$("#tab-plan"); cont.innerHTML="";
+  const allDates=Object.keys(byDate).sort();
+  if(allDates.length===0){ cont.innerHTML=`<div class="card center muted">이 기간에 일정이 없어. ＋ 로 추가하거나 자동입력 탭을 써봐.</div>`; return; }
+  const todayS=META.today;
+  // 오늘이 이 범위에 포함될 때만 지난 날짜를 접어둠
+  const includesToday = todayS>=fmt(s) && todayS<=fmt(e);
+  const pastDates = includesToday ? allDates.filter(ds=>ds<todayS) : [];
+  const curDates  = includesToday ? allDates.filter(ds=>ds>=todayS) : allDates;
+
+  const dayGroup=(ds, container)=>{
+    const d=parseD(ds); const isToday=ds===todayS;
+    const h=document.createElement("div"); h.className="day-head"+(isToday?" today":"");
+    h.innerHTML=`${WD[(d.getDay()+6)%7]} <span class="date">${d.getMonth()+1}/${d.getDate()}${isToday?" · 오늘":""}</span>`;
+    container.appendChild(h);
+    byDate[ds].forEach(it=>container.appendChild(planEl(it, ds<todayS)));
+  };
+
+  // 지난 일정 (접이식, 미완료로 보존)
+  if(pastDates.length){
+    let n=0; pastDates.forEach(ds=>n+=byDate[ds].length);
+    const undone=pastDates.reduce((a,ds)=>a+byDate[ds].filter(i=>i.status!=="done").length,0);
+    const wrap=document.createElement("div"); wrap.className="card"; wrap.style.padding="10px 12px";
+    wrap.innerHTML=`<div class="row" style="cursor:pointer" onclick="togglePast(this)">
+        <span class="caret">▸</span>&nbsp;<span class="muted">지난 일정 ${n}개${undone?` · 미완료 ${undone}`:""}</span></div>
+      <div class="past-body hide" style="margin-top:8px"></div>`;
+    const body=wrap.querySelector(".past-body");
+    pastDates.forEach(ds=>dayGroup(ds, body));
+    cont.appendChild(wrap);
+  }
+  if(curDates.length===0){
+    cont.insertAdjacentHTML("beforeend",`<div class="card center muted">오늘부터 남은 일정이 없어 👍</div>`);
+  }
+  curDates.forEach(ds=>dayGroup(ds, cont));
+}
+function togglePast(el){
+  const body=el.parentElement.querySelector(".past-body");
+  body.classList.toggle("hide");
+  el.querySelector(".caret").textContent = body.classList.contains("hide")?"▸":"▾";
+}
+function renderProgress(items){
+  // 오늘 일정 완료율만 표시
+  const counted=items.filter(i=>i.review_status!=="pending" && i.date===META.today);
+  const total=counted.length, done=counted.filter(i=>i.status==="done").length;
+  const rate=total?Math.round(done/total*100):0;
+  $("#weekProgress").innerHTML = total?
+    `<div class="row" style="margin-top:6px"><span class="muted">오늘 완료 ${done}/${total}</span>
+       <div class="spacer"></div><span style="font-weight:700;color:var(--done)">${rate}%</span></div>
+     <div class="progress"><span style="width:${rate}%"></span></div>`:"";
+}
+function planEl(it, isPast){
+  // 지난 날짜인데 완료 안 한 건 = 미완료로 취급해 표시
+  const effMissed = it.status==="missed" || (isPast && it.status!=="done");
+  const el=document.createElement("div");
+  el.className="plan"+(it.status==="done"?" done":"")+(it.is_important?" imp":"");
+  const chkCls=it.status==="done"?"chk done":effMissed?"chk missed":"chk";
+  const chkIc=it.status==="done"?"✓":effMissed?"✕":"";
+  const place=it.place==="직접입력"&&it.place_custom?it.place_custom:it.place;
+  const timeStr=it.start_time?`${it.start_time}${it.end_time?"~"+it.end_time:""}`:"";
+  let tags=`<span class="pill place">${place}</span>`;
+  if(timeStr) tags+=`<span class="pill">${timeStr}</span>`;
+  if(it.recur_freq&&it.recur_freq!=="none") tags+=`<span class="pill">🔁</span>`;
+  if(it.start_time&&it.remind_min!==-1) tags+=`<span class="pill">🔔</span>`;
+  if(it.review_status==="pending") tags+=`<span class="pill badge-auto">검토대기</span>`;
+  if(it.status==="missed"&&it.miss_category) tags+=`<span class="pill" style="color:var(--miss)">${it.miss_category}</span>`;
+  else if(effMissed&&it.status!=="missed") tags+=`<span class="pill" style="color:var(--miss)">미완료</span>`;
+  el.innerHTML=`<div class="${chkCls}" onclick="toggleStatus(event,${it.plan_id},'${it.date}','${it.status}')">${chkIc}</div>
+    <div style="flex:1" onclick='editPlan(${JSON.stringify(it).replace(/'/g,"&#39;")})'>
+      <div class="title">${esc(it.title)}</div>
+      <div class="meta">${tags}</div>
+      ${it.note?`<div class="muted" style="margin-top:3px">${esc(it.note)}</div>`:""}
+    </div>
+    <div class="star-btn ${it.is_important?"on":""}" title="중요"
+      onclick="toggleImportant(event,${it.plan_id},${it.is_important?1:0})">${it.is_important?"⭐":"☆"}</div>`;
+  return el;
+}
+async function toggleImportant(ev, pid, cur){
+  ev.stopPropagation();
+  await api("/api/plans/"+pid,{method:"PUT",body:JSON.stringify({is_important: cur?0:1})});
+  afterPlanChange();
+}
+function esc(s){ return (s||"").replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c])); }
+
+// ---------- 완료/미완료 ----------
+async function toggleStatus(ev, pid, date, cur){
+  ev.stopPropagation();
+  if(cur==="pending"){ await setStatus(pid,date,"done"); }
+  else if(cur==="done"){ openMiss(pid,date); }
+  else { await setStatus(pid,date,"pending"); }  // missed -> pending
+}
+async function setStatus(pid,date,status,cat,txt){
+  await api("/api/occurrences/status",{method:"POST",
+    body:JSON.stringify({plan_id:pid,date,status,miss_category:cat,miss_text:txt})});
+  render();
+}
+function openMiss(pid,date){
+  missCtx={pid,date}; selReason=null;
+  document.querySelectorAll("#missReasons .reason-btn").forEach(b=>b.classList.remove("sel"));
+  $("#missCustomWrap").classList.add("hide"); $("#missCustom").value="";
+  openModal("missModal");
+}
+function selectReason(btn,r){
+  document.querySelectorAll("#missReasons .reason-btn").forEach(b=>b.classList.remove("sel"));
+  btn.classList.add("sel"); selReason=r;
+  $("#missCustomWrap").classList.toggle("hide", r!=="직접입력");
+}
+async function saveMiss(){
+  if(!selReason){ toast("사유를 골라줘"); return; }
+  const txt = selReason==="직접입력" ? $("#missCustom").value.trim() : "";
+  if(selReason==="직접입력"&&!txt){ toast("이유를 적어줘"); return; }
+  await setStatus(missCtx.pid,missCtx.date,"missed",selReason,txt);
+  closeModal("missModal");
+}
+
+// ---------- 일정 모달 ----------
+function openPlanModal(presetPlace, presetDate){
+  $("#planModalTitle").textContent="일정 추가"; $("#planId").value="";
+  $("#planDelBtn").classList.add("hide");
+  $("#f_title").value=""; $("#f_note").value=""; $("#f_etime").value="";
+  $("#f_place").value = presetPlace || (FILTER_PLACE&&FILTER_PLACE!=="직접입력"?FILTER_PLACE:"직접입력");
+  $("#f_place").onchange();
+  $("#f_place_custom").value="";
+  // 기본 날짜 = 오늘(또는 체크인 등에서 넘어온 날짜), 기본 시각 = 지금 시각(5분 단위 반올림)
+  $("#f_date").value = presetDate || META.today;
+  const now=new Date();
+  let mn=Math.round(now.getMinutes()/5)*5, hh=now.getHours();
+  if(mn===60){ mn=0; hh=(hh+1)%24; }
+  $("#f_stime").value = String(hh).padStart(2,"0")+":"+String(mn).padStart(2,"0");
+  $("#f_recur").value="none"; $("#f_recur").onchange(); $("#f_scope").value=SCOPE;
+  $("#f_remind").value=""; $("#f_imp").checked=false;
+  document.querySelectorAll("#weekdayBtns button").forEach(b=>{b.classList.remove("sel","btn-accent");});
+  openModal("planModal");
+}
+function editPlan(it){
+  openModal("planModal");
+  $("#planModalTitle").textContent="일정 수정"; $("#planId").value=it.plan_id;
+  $("#planDelBtn").classList.remove("hide");
+  $("#f_title").value=it.title; $("#f_note").value=it.note||"";
+  $("#f_date").value=it.date; $("#f_place").value=it.place; $("#f_place").onchange();
+  $("#f_place_custom").value=it.place_custom||"";
+  $("#f_stime").value=it.start_time||""; $("#f_etime").value=it.end_time||"";
+  $("#f_recur").value=it.recur_freq||"none"; $("#f_recur").onchange();
+  $("#f_scope").value=it.scope||"week"; $("#f_imp").checked=!!it.is_important;
+  $("#f_remind").value=(it.remind_min===null||it.remind_min===undefined)?"":String(it.remind_min);
+}
+let _savingPlan=false;
+async function savePlan(){
+  if(_savingPlan) return;            // 저장 중 중복 클릭 방지(이중 등록 방지)
+  const title=$("#f_title").value.trim();
+  if(!title){ toast("제목을 적어줘"); return; }
+  const wds=[...document.querySelectorAll("#weekdayBtns button.sel")].map(b=>b.dataset.wd);
+  const body={
+    title, place:$("#f_place").value, place_custom:$("#f_place_custom").value,
+    note:$("#f_note").value, start_date:$("#f_date").value,
+    start_time:$("#f_stime").value||null, end_time:$("#f_etime").value||null,
+    is_important:$("#f_imp").checked, recur_freq:$("#f_recur").value,
+    recur_byweekday: wds.length?wds.join(","):null, scope:$("#f_scope").value,
+    remind_min: $("#f_remind").value===""?null:parseInt($("#f_remind").value,10),
+  };
+  const id=$("#planId").value;
+  _savingPlan=true;
+  const btn=document.getElementById("savePlanBtn"); if(btn) btn.disabled=true;
+  try{
+    if(id) await api("/api/plans/"+id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/plans",{method:"POST",body:JSON.stringify(body)});
+    closeModal("planModal"); toast("저장됨"); afterPlanChange();
+  } finally {
+    _savingPlan=false; if(btn) btn.disabled=false;
+  }
+}
+async function deletePlan(){
+  const id=$("#planId").value; if(!id) return;
+  if(!confirm("이 일정을 삭제할까? (반복이면 전체 삭제)")) return;
+  await api("/api/plans/"+id,{method:"DELETE"});
+  closeModal("planModal"); toast("삭제됨"); afterPlanChange();
+}
+function afterPlanChange(){
+  if(CURRENT_TAB==="review"){ loadReview(); refreshReviewBadge(); }
+  else if(CURRENT_TAB==="checkin"){ loadCheckin(); }
+  else render();
+}
+function editReview(p){
+  editPlan({plan_id:p.id, date:p.start_date, title:p.title, note:p.note,
+    place:p.place, place_custom:p.place_custom, start_time:p.start_time, end_time:p.end_time,
+    recur_freq:p.recur_freq, scope:p.scope, is_important:p.is_important});
+}
+
+// ---------- 체크인 ----------
+function moveCheckin(n){ CHECKIN_DATE=fmt(addDays(parseD(CHECKIN_DATE),n)); $("#checkinDate").value=CHECKIN_DATE; loadCheckin(); }
+async function loadCheckin(){
+  CHECKIN_DATE=$("#checkinDate").value||META.today;
+  const data=await api("/api/checkin?date="+CHECKIN_DATE);
+  const c=$("#checkinList"); c.innerHTML="";
+  data.items.forEach(it=>{
+    const card=document.createElement("div"); card.className="card";
+    const hasPlans=it.plans.length>0;
+    // 장소 상태 아이콘
+    const mark = hasPlans?`<span class="pill place">${it.plans.length}건</span>`
+      : it.is_none?`<span class="pill" style="color:var(--mut)">없음</span>`
+      : `<span class="pill" style="color:var(--imp);border-color:var(--imp)">미점검</span>`;
+    // 일정 목록
+    let plansHtml="";
+    it.plans.forEach(p=>{
+      const t=p.start_time?`<span class="muted">${p.start_time}</span> `:"";
+      const done=p.status==="done"?"opacity:.5;text-decoration:line-through":"";
+      plansHtml+=`<div class="ci-plan" style="${done}" onclick='editPlan(${JSON.stringify(
+        {plan_id:p.plan_id,date:CHECKIN_DATE,title:p.title,place:it.place,place_custom:p.place_custom,
+         start_time:p.start_time,is_important:p.is_important,recur_freq:"none",scope:"week"}).replace(/'/g,"&#39;")})'>
+        • ${t}${esc(p.title)}${p.is_important?" ⭐":""}</div>`;
+    });
+    card.innerHTML=`<div class="checkin-place">${it.place} ${mark}
+        <div class="spacer"></div>
+        ${hasPlans?"":`<button class="btn-sm none-btn ${it.is_none?"on":""}"
+            onclick="setCheckinNone('${it.place}',${!it.is_none})">${it.is_none?"✓ 없음":"없음"}</button>`}
+      </div>
+      ${plansHtml}
+      <button class="btn-sm btn-accent" style="margin-top:8px;width:100%"
+        onclick="addPlanForPlace('${it.place}')">＋ ${it.place} 일정 추가</button>`;
+    c.appendChild(card);
+  });
+  const remaining=data.items.filter(it=>!(it.plans.length||it.is_none)).map(it=>it.place);
+  const status=document.createElement("div"); status.className="card center";
+  status.innerHTML = data.complete
+    ? `<span style="color:var(--done)">✅ 오늘 모든 장소 점검 완료</span>`
+    : `<span class="muted">아직 점검 안 한 곳: <b style="color:var(--imp)">${remaining.join(", ")}</b><br>
+       <span style="font-size:12px">일정을 추가하거나 ‘없음’을 체크해줘</span></span>`;
+  c.appendChild(status);
+}
+function addPlanForPlace(place){ openPlanModal(place, CHECKIN_DATE); }
+async function setCheckinNone(place, checked){
+  await api("/api/checkin",{method:"POST",body:JSON.stringify(
+    {date:CHECKIN_DATE,place,is_none:checked})});
+  loadCheckin();
+}
+
+// ---------- 검토큐 ----------
+async function refreshReviewBadge(){
+  try{ const d=await api("/api/review-queue");
+    $("#reviewBadge").textContent = d.items.length?`검토(${d.items.length})`:"검토";
+  }catch(e){}
+}
+async function loadReview(){
+  const d=await api("/api/review-queue");
+  const c=$("#reviewList"); c.innerHTML="";
+  if(!d.items.length){ c.innerHTML=`<div class="card center muted">검토할 자동 제안이 없어.</div>`; return; }
+  d.items.forEach(p=>{
+    const place=p.place==="직접입력"&&p.place_custom?p.place_custom:p.place;
+    const el=document.createElement("div"); el.className="card";
+    el.innerHTML=`<div class="title" style="font-weight:600">${p.is_important?"⭐ ":""}${esc(p.title)}</div>
+      <div class="meta" style="font-size:12px;color:var(--mut);margin:4px 0">
+        <span class="pill place">${place}</span>
+        <span class="pill">${p.start_date}${p.start_time?" "+p.start_time:""}</span></div>
+      ${p.source_text?`<div class="muted" style="font-size:12px">원문: ${esc(p.source_text).slice(0,80)}</div>`:""}
+      <div class="row" style="margin-top:8px;gap:8px">
+        <button class="btn-sm" style="color:var(--miss)" onclick="reviewAct(${p.id},'reject')">거절</button>
+        <button class="btn-sm" onclick='editReview(${JSON.stringify(p).replace(/'/g,"&#39;")})'>수정</button>
+        <div class="spacer"></div>
+        <button class="btn-sm btn-accent" onclick="reviewAct(${p.id},'confirm')">승인</button></div>`;
+    c.appendChild(el);
+  });
+}
+async function reviewAct(id,action){
+  await api("/api/plans/"+id+"/review",{method:"POST",body:JSON.stringify({action})});
+  toast(action==="confirm"?"승인됨":"거절됨"); loadReview(); refreshReviewBadge(); render();
+}
+
+// ---------- 자동입력 ----------
+async function parseText(){
+  const text=$("#autoText").value.trim(); if(!text){ toast("텍스트를 넣어줘"); return; }
+  if(!META.claude_enabled){ toast("서버에 anthropic_api_key 설정 필요"); return; }
+  const src=$("#autoSource").value;
+  $("#autoResult").innerHTML=`<div class="card center muted">변환 중...</div>`;
+  try{
+    const d=await api("/api/parse",{method:"POST",body:JSON.stringify({text,save:true,source:src})});
+    if(d.error){ $("#autoResult").innerHTML=`<div class="card" style="color:var(--miss)">에러: ${esc(d.error)}</div>`; return; }
+    const n=(d.saved_ids||[]).length;
+    let html=`<div class="card"><b>${n}건 ${src==="auto"?"검토큐에 추가":"등록"}됨</b>`;
+    (d.candidates||[]).forEach(c=>{ html+=`<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px">
+      ${esc(c.title)} · ${c.start_date||"?"} ${c.start_time||""} <span class="pill place">${c.place||"직접입력"}</span></div>`; });
+    html+=`</div>`;
+    $("#autoResult").innerHTML=html; $("#autoText").value="";
+    refreshReviewBadge();
+    if(src!=="auto") render();
+  }catch(e){ $("#autoResult").innerHTML=`<div class="card" style="color:var(--miss)">실패: ${e}</div>`; }
+}
+
+async function parseFiles(){
+  const inp=$("#autoFile"); const files=inp.files;
+  if(!files||!files.length){ toast("사진이나 PDF를 골라줘"); return; }
+  if(!META.claude_enabled){ toast("서버에 claude 설정 필요"); return; }
+  const src=$("#autoSource").value;
+  const res=$("#autoResult");
+  let allHtml="", total=0;
+  for(let i=0;i<files.length;i++){
+    res.innerHTML=`<div class="card center muted">${files[i].name} 읽는 중... (${i+1}/${files.length})</div>`;
+    const fd=new FormData(); fd.append("file",files[i]); fd.append("save","1"); fd.append("source",src);
+    try{
+      const r=await fetch("/api/parse-file",{method:"POST",body:fd});
+      const d=await r.json();
+      if(d.error){ allHtml+=`<div class="card" style="color:var(--miss)">${esc(files[i].name)}: ${esc(d.error)}</div>`; continue; }
+      const n=(d.saved_ids||[]).length; total+=n;
+      let h=`<div class="card"><b>📄 ${esc(files[i].name)} — ${n}건 ${src==="auto"?"검토큐로":"등록"}</b>`;
+      (d.candidates||[]).forEach(c=>{ h+=`<div style="margin-top:6px;border-top:1px solid var(--line);padding-top:6px">
+        ${esc(c.title||"?")} · ${c.start_date||"?"} ${c.start_time||""} <span class="pill place">${esc(c.place||"직접입력")}</span></div>`; });
+      h+=`</div>`; allHtml+=h;
+    }catch(e){ allHtml+=`<div class="card" style="color:var(--miss)">${esc(files[i].name)}: ${e}</div>`; }
+  }
+  res.innerHTML=allHtml||`<div class="card muted">읽은 일정이 없어</div>`;
+  inp.value=""; refreshReviewBadge();
+  if(src!=="auto"){ toast(`${total}건 등록됨`); }
+}
+
+// ---------- 통계 ----------
+async function loadStats(){
+  const s=startOfWeek(parseD(META.today)), e=addDays(s,6);
+  const d=await api(`/api/stats?from=${fmt(s)}&to=${fmt(e)}`);
+  let html=`<div class="card center"><div class="muted">이번 주 완료율</div>
+    <div class="stat-big" style="color:var(--done)">${d.completion_rate}%</div>
+    <div class="muted">완료 ${d.done} · 미완료 ${d.missed} · 예정 ${d.pending} / 총 ${d.total}</div></div>`;
+  // 장소별
+  html+=`<div class="card"><b>장소별 달성률</b>`;
+  const places=Object.keys(d.by_place);
+  if(!places.length) html+=`<div class="muted" style="margin-top:6px">데이터 없음</div>`;
+  places.forEach(p=>{ const v=d.by_place[p]; const rate=v.total?Math.round(v.done/v.total*100):0;
+    html+=`<div class="bar-row"><span style="width:54px">${p}</span>
+      <div class="bar"><span style="width:${rate}%"></span></div><span>${rate}%</span></div>`; });
+  html+=`</div>`;
+  // 사유별 (누르면 해당 일정 목록 펼침)
+  html+=`<div class="card"><b>미완료 사유</b><div class="muted" style="font-size:12px;margin:2px 0 4px">누르면 어떤 일정이었는지 보여줘</div>`;
+  const reasons=Object.keys(d.by_reason);
+  if(!reasons.length) html+=`<div class="muted" style="margin-top:6px">미완료 없음 👍</div>`;
+  reasons.sort((a,b)=>d.by_reason[b]-d.by_reason[a]).forEach((r,i)=>{
+    const items=(d.reason_items&&d.reason_items[r])||[];
+    let inner="";
+    items.forEach(it=>{
+      const dd=parseD(it.date);
+      const place=it.place||"";
+      inner+=`<div class="ci-plan" style="cursor:default">• ${dd.getMonth()+1}/${dd.getDate()} ${esc(it.title)}
+        <span class="pill place">${esc(place)}</span>${it.miss_text?` <span class="muted">— ${esc(it.miss_text)}</span>`:""}</div>`;
+    });
+    html+=`<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px">
+      <div class="row" style="cursor:pointer" onclick="toggleReason(${i})">
+        <span class="caret" id="rcaret${i}">▸</span>&nbsp;<span style="flex:1">${esc(r)}</span>
+        <span class="pill">${d.by_reason[r]}회</span></div>
+      <div class="reason-body hide" id="rbody${i}" style="margin-top:6px">${inner}</div></div>`;
+  });
+  html+=`</div>`;
+  $("#statsBody").innerHTML=html;
+}
+function toggleReason(i){
+  const body=document.getElementById("rbody"+i), caret=document.getElementById("rcaret"+i);
+  body.classList.toggle("hide");
+  caret.textContent = body.classList.contains("hide")?"▸":"▾";
+}
+
+// ---------- 모달 헬퍼 ----------
+function openModal(id){ $("#"+id).classList.add("open"); }
+function closeModal(id){ $("#"+id).classList.remove("open"); }
+document.querySelectorAll(".modal-bg").forEach(m=>m.addEventListener("click",e=>{ if(e.target===m) m.classList.remove("open"); }));
+
+// ---------- 알림(웹 푸시) ----------
+function urlB64ToUint8(b64){
+  const pad="=".repeat((4-b64.length%4)%4);
+  const base=(b64+pad).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base); const arr=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) arr[i]=raw.charCodeAt(i);
+  return arr;
+}
+async function getSub(){
+  if(!("serviceWorker" in navigator)) return null;
+  const reg=await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function updatePushUI(){
+  const st=$("#pushState"), btn=$("#pushToggleBtn");
+  if(!("serviceWorker" in navigator) || !("PushManager" in window)){
+    st.textContent="이 브라우저는 푸시 알림을 지원하지 않아."; btn.classList.add("hide"); return;
+  }
+  const sub=await getSub();
+  if(Notification.permission==="denied"){
+    st.textContent="🔕 알림이 차단됨 — 브라우저 사이트 설정에서 허용해줘.";
+  }else if(sub){
+    st.innerHTML="✅ 이 기기에서 알림 받는 중"; btn.textContent="알림 끄기"; btn.classList.remove("btn-accent");
+  }else{
+    st.textContent="이 기기는 아직 알림을 안 받고 있어."; btn.textContent="이 기기에서 알림 받기"; btn.classList.add("btn-accent");
+  }
+}
+async function togglePush(){
+  try{
+    const sub=await getSub();
+    if(sub){
+      await api("/api/push/unsubscribe",{method:"POST",body:JSON.stringify({endpoint:sub.endpoint})});
+      await sub.unsubscribe(); toast("알림 껐어"); updatePushUI(); return;
+    }
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){ toast("알림 권한이 필요해"); updatePushUI(); return; }
+    const reg=await navigator.serviceWorker.ready;
+    const {key}=await (await fetch("/api/push/key")).json();
+    const newSub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToUint8(key)});
+    const ua=navigator.userAgent;
+    const platform=/iPhone|iPad|iPod/.test(ua)?"ios":/Android/.test(ua)?"android":"web";
+    await api("/api/push/subscribe",{method:"POST",body:JSON.stringify({subscription:newSub.toJSON(),platform})});
+    toast("알림 켰어!"); updatePushUI();
+  }catch(e){ toast("알림 설정 실패: "+e.message); }
+}
+async function testPush(){
+  const r=await api("/api/push/test",{method:"POST"});
+  toast(r.sent?`${r.sent}개 기기로 보냄 📨`:"구독된 기기 없음 — 먼저 ‘알림 받기’ 눌러줘");
+}
+async function localTest(){
+  try{
+    if(!("Notification" in window)){ toast("이 브라우저는 알림 미지원"); return; }
+    let perm=Notification.permission;
+    if(perm!=="granted") perm=await Notification.requestPermission();
+    if(perm!=="granted"){ toast("알림 권한이 꺼져 있어 ("+perm+")"); return; }
+    const reg=await navigator.serviceWorker.ready;
+    await reg.showNotification("📍 로컬 알림 테스트", {
+      body:"이게 보이면 권한·표시는 정상이야!", icon:"/static/icon.svg", tag:"localtest"});
+    toast("로컬 알림 띄웠어 (안 보이면 Windows 알림설정/집중지원 문제)");
+  }catch(e){ toast("실패: "+e.message); }
+}
+
+// ---------- 알림 시간 설정 ----------
+let notifDays=new Set();
+function buildNotifDays(){
+  const c=$("#n_weekly_days"); c.innerHTML="";
+  WD.forEach((w,i)=>{ const b=document.createElement("button"); b.className="btn-sm"; b.textContent=w; b.dataset.wd=i;
+    b.onclick=()=>{ notifDays.has(i)?notifDays.delete(i):notifDays.add(i); paintNotifDays(); };
+    c.appendChild(b); });
+}
+function paintNotifDays(){ document.querySelectorAll("#n_weekly_days button").forEach(b=>{
+  b.classList.toggle("btn-accent", notifDays.has(+b.dataset.wd)); }); }
+async function loadNotif(){
+  const d=await api("/api/notif-settings");
+  $("#n_weekly").checked=d.weekly_enabled; $("#n_weekly_time").value=d.weekly_time;
+  $("#n_morning").checked=d.morning_enabled; $("#n_morning_time").value=d.morning_time;
+  $("#n_remind").checked=d.remind_enabled; $("#n_remind_default").value=d.remind_default||"30";
+  notifDays=new Set((d.weekly_days||"").split(",").filter(x=>x!=="").map(Number)); paintNotifDays();
+}
+async function saveNotif(){
+  await api("/api/notif-settings",{method:"POST",body:JSON.stringify({
+    weekly_enabled:$("#n_weekly").checked, weekly_time:$("#n_weekly_time").value,
+    weekly_days:[...notifDays].sort((a,b)=>a-b).join(","),
+    morning_enabled:$("#n_morning").checked, morning_time:$("#n_morning_time").value,
+    remind_enabled:$("#n_remind").checked, remind_default:$("#n_remind_default").value})});
+  toast("알림 설정 저장됨");
+}
+function loadSettingsTab(){ updatePushUI(); loadNotif(); loadExcludes(); }
+
+// ---------- 자동읽기 제외 키워드 ----------
+let EXCLUDES=[];
+async function loadExcludes(){
+  const d=await api("/api/ingest-excludes"); EXCLUDES=d.excludes||[]; renderExcludes();
+}
+function renderExcludes(){
+  const c=$("#exList");
+  if(!EXCLUDES.length){ c.innerHTML=`<div class="muted" style="font-size:12px">아직 없음 — 모든 데까르트 카톡을 일정 후보로 검토해.</div>`; return; }
+  c.innerHTML=EXCLUDES.map((k,i)=>`<span class="pill" style="margin:3px;display:inline-flex;align-items:center;gap:6px">
+    ${esc(k)} <span style="cursor:pointer;color:var(--miss)" onclick="delExclude(${i})">✕</span></span>`).join("");
+}
+async function saveExcludes(){
+  const d=await api("/api/ingest-excludes",{method:"POST",body:JSON.stringify({excludes:EXCLUDES})});
+  EXCLUDES=d.excludes||[]; renderExcludes();
+}
+function addExclude(){
+  const v=$("#exInput").value.trim(); if(!v) return;
+  if(!EXCLUDES.includes(v)) EXCLUDES.push(v);
+  $("#exInput").value=""; saveExcludes(); toast("제외어 추가됨");
+}
+function delExclude(i){ EXCLUDES.splice(i,1); saveExcludes(); }
+
+// PWA
+if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); }
+boot();
+</script>
+</body>
+</html>

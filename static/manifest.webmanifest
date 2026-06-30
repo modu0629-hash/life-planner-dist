@@ -1,0 +1,27 @@
+{
+  "name": "생활 플래너",
+  "short_name": "플래너",
+  "description": "개인 생활 계획표 — 주간 계획·반복·완료체크·자동입력",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6fb",
+  "theme_color": "#f4f6fb",
+  "lang": "ko",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "share_target": {
+    "action": "/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        { "name": "files", "accept": ["image/*", "application/pdf"] }
+      ]
+    }
+  }
+}
